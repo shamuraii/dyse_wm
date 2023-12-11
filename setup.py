@@ -33,7 +33,7 @@ setup(
         'PyQt5==5.13', # GUI, QtWebEngine MacOS error with 5.14 and 5.15
         'seaborn', # Visualization
         'statsmodels',
-        'sklearn'
+        'scikit-learn'
     ],
     zip_safe=False # install as directory
     )
