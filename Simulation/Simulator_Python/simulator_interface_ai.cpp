@@ -169,7 +169,7 @@ void calculate_trace_difference(vector<string> inputFilenames, string outputFile
         first_trace_data.push_back(line);
     }
     bool transpose_format = false;
-    if (first_trace_data[0][0] == '\t') { //TODO: check if \t or #
+    if (first_trace_data[0][0] == '#') { //TODO: check if \t or #
         transpose_format = true;
     }
 
@@ -190,7 +190,7 @@ void calculate_trace_difference(vector<string> inputFilenames, string outputFile
             string current_trace = this_trace_data[content_index];
             if (current_trace.find("Frequency") != string::npos || current_trace.find("Run") != string::npos) {
                 output_file << current_trace << endl;
-            } else if (current_trace[0] == '\t') { // TODO: Check if \t or #, also should use find not [0]
+            } else if (current_trace[0] == '#') { // TODO: Check if \t or #, also should use find not [0]
                 if (current_trace != first_trace_data[content_index]) {
                     throw invalid_argument("Element names in trace files do not match");
                 }
@@ -244,7 +244,7 @@ void concatenate_traces(vector<string> inputFilenames, string outputFilename) {
         while (getline(this_file, line)) {
             traces.push_back(line);
         }
-        if (traces[0][0] != '\t') { // TODO: Check if # or \t and if should be string.find
+        if (traces[0][0] != '#') { // TODO: Check if # or \t and if should be string.find
             throw invalid_argument("Invalid trace file format");
         }
         smatch scenario_index;
