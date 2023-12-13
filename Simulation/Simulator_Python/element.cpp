@@ -241,7 +241,7 @@ public:
         names.push_back(X);
         return names;
     }
-    void update(std::unordered_map<std::string, Element> getElement, std::unordered_map<std::string, double> memo, int step, std::string simtype) {
+    void update(std::unordered_map<std::string, Element> getElement, std::unordered_map<std::string, vector<double>> memo, int step = 0, std::string simtype = "sync") {
         __name_to_value.clear();
         __name_to_index.clear();
         __name_to_trend.clear();
@@ -256,7 +256,7 @@ public:
         set_prev_value(__name_to_value);
         set_prev_index(__name_to_index);
     }
-    void update_next(std::unordered_map<std::string, Element> getElement, std::unordered_map<std::string, double> memo, int step, std::string simtype) {
+    void update_next(std::unordered_map<std::string, Element> getElement, std::unordered_map<std::string, vector<double>> memo, int step = 0, std::string simtype = "sync") {
         __name_to_value.clear();
         __name_to_index.clear();
         __name_to_trend.clear();
@@ -271,12 +271,11 @@ public:
         set_prev_value(__name_to_value);
         set_prev_index(__name_to_index);
     }
-    int evaluate(std::unordered_map<std::string, double> memo, int step, std::string simtype) {
+    int evaluate(std::unordered_map<std::string, vector<double>> memo, int step, std::string simtype) {
         int X_next_index = 0;
         std::string mapping = "increment";
-        std::map<std::string, std::vector<double>> memo2;
-        double y_act = eval_reg(__act, 0, memo2, step)[0];
-        double y_inh = eval_reg(__inh, 0, memo2, step)[0];
+        double y_act = eval_reg(__act, 0, memo, step)[0];
+        double y_inh = eval_reg(__inh, 0, memo, step)[0];
         
         int max_value_index = __levels - 1;
         if (mapping == "increment") {
@@ -566,7 +565,7 @@ public:
         return std::max(temp_out, 0);
     }
 
-    std::vector<double> eval_reg(std::string reg_rule, int layer, std::map<std::string, std::vector<double>>& memo, int step = 0) {
+    std::vector<double> eval_reg(std::string reg_rule, int layer, std::unordered_map<std::string, std::vector<double>> memo, int step = 0) {
         std::vector<double> result;
         if (!reg_rule.empty()) {
             int N = this->__levels - 1;
@@ -708,13 +707,13 @@ public:
         }
         return result;
     }
-    double evaluate_state(std::vector<double> state) {
+    double evaluate_state(std::vector<int> state) {
         this->__name_to_value.clear();
         for (std::size_t reg_index = 0; reg_index < state.size(); ++reg_index) {
             this->__name_to_value[this->__name_list[reg_index]] = state[reg_index];
             this->__name_to_trend[this->__name_list[reg_index]] = 0.0;
         }
-        std::map<std::string, std::vector<double>> memo;
+        std::unordered_map<std::string, std::vector<double>> memo;
         std::vector<double> y_act = this->eval_reg(this->__act, 0, memo);
         std::vector<double> y_inh = this->eval_reg(this->__inh, 0, memo);
         int X_curr_index = std::distance(this->__levels_array.begin(), std::find(this->__levels_array.begin(), this->__levels_array.end(), state.back()));
@@ -789,12 +788,12 @@ public:
         double value = this->__levels_array[value_index];
         return value;
     }
-    std::vector<std::vector<double>> generate_all_input_state(bool include_regulated = false) {
+    std::vector<std::vector<int>> generate_all_input_state(bool include_regulated = false) {
         std::size_t length = include_regulated ? this->__name_list.size() : this->__name_list.size() - 1;
         std::size_t levels = this->__levels;
-        std::vector<std::vector<double>> total_states;
+        std::vector<std::vector<int>> total_states;
         for (std::size_t num = 0; num < std::pow(levels, length); ++num) {
-            std::vector<double> this_state(length, 0);
+            std::vector<int> this_state(length, 0);
             std::size_t temp = num;
             std::size_t bit_index = length - 1;
             while (temp > 0) {
@@ -810,11 +809,11 @@ public:
         if (this->__act.empty() && this->__inh.empty()) {
             return;
         } else {
-            std::vector<std::vector<double>> input_states = this->generate_all_input_state(true);
+            std::vector<std::vector<int>> input_states = this->generate_all_input_state(true);
             std::size_t bit_length = std::ceil(std::log2(this->__levels));
             std::vector<std::vector<std::string>> mode_to_expression(bit_length);
             for (const auto& state : input_states) {
-                double value = this->evaluate_state(state);
+                int value = this->evaluate_state(state);
                 std::size_t k = 0;
                 while (value > 0) {
                     if (std::fmod(value, 2)) {
@@ -845,7 +844,7 @@ public:
             output_model_file << "}\n";
         }
     }
-    std::string state_to_expression(const std::vector<double>& state) {
+    std::string state_to_expression(const std::vector<int>& state) {
         std::vector<std::string> result;
         for (std::size_t index = 0; index < state.size(); ++index) {
             const std::string& element = this->__name_list[index];

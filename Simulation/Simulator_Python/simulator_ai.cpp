@@ -314,8 +314,8 @@ class Simulator {
                 int totalNumElements = __updateList.size();
             }
             
+            std::vector<int> progress_ticks;
             if (progressReport) {
-                std::vector<int> progress_ticks;
                 for (int i = 0; i <= runs; i += runs/10) {
                     progress_ticks.push_back(i);
                 }
@@ -327,8 +327,8 @@ class Simulator {
                     set_random_initial(scenario);
                 }
                 
-                std::map<std::string, std::vector<double>> memo;
-                std::map<std::string, std::vector<double>> memo_trend;
+                std::unordered_map<std::string, std::vector<double>> memo;
+                std::unordered_map<std::string, std::vector<double>> memo_trend;
                 
                 for (auto& element : __getElement) {
                     if (normalize) {
@@ -338,13 +338,18 @@ class Simulator {
                     }
                     memo_trend[element.first] = {0};
                     element.second.set_trend_index(0);
-                    if (boost::find(__updateList,element.first) != __updateList.end()) {
+                    bool found = false;
+                    for (const auto& val : __updateList) {
+                        if (val == element.first) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) {
                         for (const std::string& el_reg : element.second.get_name_list()) {
                             element.second.set_prev_value({{el_reg, __getElement[el_reg].get_current_value()}});
                             element.second.set_prev_index({{el_reg, __getElement[el_reg].get_current_value_index()}});
                         }
-
-                        
                     } else {
                         element.second.set_prev_value({{element.first, element.second.get_current_value()}});
                         element.second.set_prev_index({{element.first, element.second.get_current_value_index()}});
@@ -419,7 +424,7 @@ class Simulator {
                                                 if (passed) {
                                                     update_next(key);
                                                 } else {
-                                                    __getElement[key].__next_val_index = __getElement[key].get_current_value_index();
+                                                    __getElement[key].set_value_index(__getElement[key].get_current_value_index());
                                                 }
                                                 alreadyUpdated.push_back(key);
                                             }
@@ -452,7 +457,7 @@ class Simulator {
                             std::random_shuffle(randomList.begin(), randomList.end());
                             for (auto& j : randomList) {
                                 std::string element = currentRankList[j];
-                                __getElement[element].update(__getElement, memo, step);
+                                __getElement[element].update(__getElement, memo, step, simtype);
                             }
                         }
                     }
@@ -477,9 +482,9 @@ class Simulator {
                         square_sum[element.first][step] += ele_value * ele_value;
                         
                         if (__switchStep.find(element.first) != __switchStep.end()) {
-                            for (int index = 0; index < __switchStep[element.first][scenario].size(); index++) {
-                                if (__switchStep[element.first][scenario][index] == step) {
-                                    int toggle_val = __switchValue[element.first][scenario][index];
+                            for (int index = 0; index < 1; index++) {
+                                if (__switchStep[element.first][scenario] == step) {
+                                    int toggle_val = __switchValue[element.first][scenario];
                                     int trend_current = toggle_val - element.second.get_current_value_index();
                                     element.second.set_trend_index(trend_current);
                                     element.second.set_value_index(toggle_val);
@@ -554,7 +559,7 @@ class Simulator {
             
             if (outMode != 2 && outMode != 7 && (simtype != "sync" || simtype != "sync_multi" || simtype != "rand_sync" || simtype != "rand_sync_gauss")) {
                 if (outMode == 3) {
-                    output_file << "Run #" << run << std::endl;
+                    output_file << "Run #" << runs << std::endl;
                 }
                 
                 output_file << "Frequency Summary:" << std::endl;
@@ -591,7 +596,8 @@ class Simulator {
 
     void update(std::string element) {
         if (std::find(__updateList.begin(), __updateList.end(), element) != __updateList.end()) {
-            __getElement[element].update(__getElement);
+            std::unordered_map<string, vector<double>> memo;
+            __getElement[element].update(__getElement, memo);
         } else {
             std::cout << "Element has no regulators" << std::endl;
         }
@@ -599,29 +605,32 @@ class Simulator {
 
     void update_next(std::string element) {
         if (std::find(__updateList.begin(), __updateList.end(), element) != __updateList.end()) {
-            __getElement[element].update_next(__getElement);
+            std::unordered_map<string, vector<double>> memo;
+            __getElement[element].update_next(__getElement, memo);
         } else {
             std::cout << "Element has no regulators" << std::endl;
         }
     }
 
-    std::string ra_update(std::map<std::string, vector<double>> memo, int step) {
+    std::string ra_update(std::unordered_map<std::string, vector<double>> memo, int step) {
         if (__totalPriority > 0) {
-            int priorityIndex = (int) rand() % __totalPriority;
-            std::string element = __rateUpdateList[priorityIndex].update_next(__getElement, memo, step);
+            int priorityIndex = (int) rand() / RAND_MAX * __totalPriority;
+            std::string element = __rateUpdateList[priorityIndex];
+            __getElement[element].update_next(__getElement, memo, step);
             return element;
         } else {
-            std::string element = __updateList[rand() % __updateList.size()].update_next(__getElement, memo, step);
+            std::string element = __updateList[rand() % __updateList.size()];
+            __getElement[element].update_next(__getElement, memo, step);
             return element;
         }
     }
 
-    std::string fixed_updates(std::map<std::string, vector<double>> memo, int step, std::string element) {
+    std::string fixed_updates(std::unordered_map<std::string, vector<double>> memo, int step, std::string element) {
         __getElement[element].update_next(__getElement, memo, step);
         return element;
     }
 
-    void sync_update(std::map<std::string, vector<double>> memo, int step, std::string simtype) {
+    void sync_update(std::unordered_map<std::string, vector<double>> memo, int step, std::string simtype) {
         for (std::string element : __updateList) {
             __getElement[element].update_next(__getElement, memo, step, simtype);
         }
@@ -633,7 +642,8 @@ class Simulator {
     bool prob_update(std::string element) {
         double prob = __probUpdate[element];
         if (prob > (double)rand() / RAND_MAX) {
-            __getElement[element].update_next(__getElement);
+            std::unordered_map<string, vector<double>> memo;
+            __getElement[element].update_next(__getElement, memo);
             return true;
         }
         return false;
@@ -642,14 +652,15 @@ class Simulator {
     std::pair<std::string, bool> prob_update_ra() {
         std::string element;
         if (__totalPriority > 0) {
-            int priorityIndex = rand() % __totalPriority;
+            int priorityIndex = rand() / RAND_MAX * __totalPriority;
             element = __rateUpdateList[priorityIndex];
         } else {
             element = __updateList[rand() % __updateList.size()];
         }
         double prob = __probUpdate[element];
         if (prob > (double)rand() / RAND_MAX) {
-            __getElement[element].update_next(__getElement);
+            std::unordered_map<string, vector<double>> memo;
+            __getElement[element].update_next(__getElement, memo);
             return std::make_pair(element, true);
         }
         return std::make_pair(element, false);
@@ -668,7 +679,7 @@ class Simulator {
 
         for (std::string name : all_names) {
             int bit_length = std::ceil(std::log2(__getElement[name].get_levels()));
-            int this_initial = __initial[name][scenario];
+            int this_initial = __initial[name];
             std::string this_initial_bin = std::bitset<32>(this_initial).to_string().substr(32 - bit_length);
             if (bit_length > 1) {
                 for (int k = 0; k < bit_length; k++) {
@@ -699,8 +710,7 @@ class Simulator {
     void create_truth_tables(std::string outputBaseFilename, int scenario) {
         for (auto& pair : __getElement) {
             std::string regulated = pair.second.get_name();
-            std::ofstream output_model_file(outputBaseFilename + "_" + regulated + ".xlsx");
-            std::ofstream output_model(output_model_file);
+            std::ofstream output_model(outputBaseFilename + "_" + regulated + ".txt");
             output_model << regulated << std::endl;
             std::vector<std::string> name_list = pair.second.get_name_list();
             for (int i = 0; i < name_list.size(); i++) {
@@ -720,21 +730,23 @@ class Simulator {
                 }
                 output_model << std::endl;
             }
-            output_model_file.close();
+            output_model.close();
         }
     }
 
+    /*
     std::map<std::string, std::vector<std::string>> parse_truth_table(std::map<std::string, std::vector<std::string>> truthTable, int levels) {
         std::map<std::string, std::vector<std::string>> table;
         table["Regulators"] = truthTable["Regulators"];
-        table["Prop_delays"] = std::vector<int>(table["Regulators"].size(), 0);
-        std::string reset = truthTable.keys()[1];
+        table["Prop_delays"] = std::vector<std::string>(table["Regulators"].size(), 0);
+        auto it = truthTable.begin();
+        std::string reset = (++it)->first;
         if (reset == "reset" || reset == "r" || reset == "Reset" || reset == "R") {
-            table["Reset"] = "reset";
+            table["Reset"] = {"reset"};
         } else if (reset == "no-reset" || reset == "n" || reset == "No-reset" || reset == "no-Reset" || reset == "N" || reset == "no reset" || reset == "No reset" || reset == "no Reset") {
-            table["Reset"] = "no-reset";
+            table["Reset"] = {"no-reset"};
         } else {
-            table["Reset"] = "reset";
+            table["Reset"] = {"reset"};
         }
         for (int i = 0; i < table["Regulators"].size() - 1; i++) {
             if (table["Regulators"][i].find("~") != std::string::npos) {
@@ -745,7 +757,9 @@ class Simulator {
             }
         }
         std::map<std::vector<int>, int> temp_table;
-        std::vector<std::string> temp_table_keys = truthTable.keys();
+        std::vector<std::string> temp_table_keys;
+        for (auto &keyval : truthTable)
+            temp_table_keys.push_back(keyval.first);
         temp_table_keys.erase(temp_table_keys.begin());
         temp_table_keys.erase(temp_table_keys.end() - 1);
         for (int i = 0; i < temp_table_keys.size(); i++) {
@@ -771,19 +785,19 @@ class Simulator {
         table["Reg_delays"] = reg_delays_array;
         return table;
     }
-
+    */
     std::string get_expression_from_truth_table(std::map<std::string, std::vector<std::string>> truthTable, std::string A) {
         std::cout << "Truth table conversion to expression not yet supported" << std::endl;
         return A;
     }
 
 };
-
+/*
 int main() {
     string model_file;
     cin >> model_file;
     Simulator sim(model_file);
     return 0;
 }
-
+*/
 
