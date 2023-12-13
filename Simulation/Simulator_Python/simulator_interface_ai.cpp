@@ -19,6 +19,7 @@
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/program_options.hpp>
 
+#include "simulator_ai.cpp"
 
 using namespace std;
 
@@ -105,7 +106,7 @@ void setup_and_create_truth_tables(string inputFilename, string outputBaseFilena
 
 int calculate_simulation_steps(string inputFilename, int time_units, int scale_factor = 1) {
     Simulator model(inputFilename);
-    map<string, Element> elements = model.get_elements();
+    unordered_map<string, Element> elements = model.get_elements();
     int num_elements = elements.size();
     for (auto element : elements) {
         if (element.second.get_act() == "" && element.second.get_inh() == "") {
@@ -118,7 +119,7 @@ int calculate_simulation_steps(string inputFilename, int time_units, int scale_f
 
 vector<int> calculate_toggle_steps(string inputFilename, vector<int> toggle_times, int scale_factor = 1) {
     Simulator model(inputFilename);
-    map<string, Element> elements = model.get_elements();
+    unordered_map<string, Element> elements = model.get_elements();
     int num_elements = elements.size();
     for (auto element : elements) {
         if (element.second.get_act() == "" && element.second.get_inh() == "") {
